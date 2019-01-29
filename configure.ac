@@ -895,6 +895,11 @@ AC_CHECK_TOOL([READELF], [readelf])
 
 st_STACKTRACE
 
+PKG_CHECK_MODULES([LIBDRM], [libdrm],
+		  [CPPFLAGS="$CPPFLAGS $LIBDRM_CFLAGS"
+		   AC_CHECK_HEADERS([drm.h])],
+		  [AC_CHECK_HEADERS([drm/drm.h])])
+
 if test "$arch" = mips && test "$no_create" != yes; then
 	mkdir -p linux/mips
 	if $srcdir/linux/mips/genstub.sh linux/mips; then
