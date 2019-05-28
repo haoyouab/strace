@@ -97,6 +97,7 @@ check_PROGRAMS = $(PURE_EXECUTABLES) \
 	inject-nf \
 	int_0x80 \
 	ioctl_dm-v \
+	ioctl_drm-success \
 	ioctl_evdev-success \
 	ioctl_evdev-success-v \
 	ioctl_evdev-v \
@@ -234,6 +235,7 @@ DECODER_TESTS = \
 	getuid.test \
 	int_0x80.test \
 	ioctl.test \
+	ioctl_drm-success.test \
 	ioctl_evdev-success-v.test \
 	ioctl_evdev-success.test \
 	ioctl_perf-success.test \
