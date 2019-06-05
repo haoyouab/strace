@@ -76,6 +76,13 @@ drm_decode_number(struct tcb *const tcp, const unsigned int code)
 {
 	const unsigned int nr = _IOC_NR(code);
 
+	if (drm_is_priv(tcp->u_arg[1])) {
+		if (verbose(tcp)) {
+			if (drm_is_driver(tcp, "i915"))
+				return drm_i915_decode_number(tcp, code);
+		}
+	}
+
 	if (_IOC_DIR(code) == (_IOC_READ | _IOC_WRITE)) {
 		switch (nr) {
 			case 0xa7:
@@ -623,6 +630,14 @@ int
 drm_ioctl(struct tcb *const tcp, const unsigned int code,
 	  const kernel_ulong_t arg)
 {
+	/* Check for device specific ioctls */
+	if (drm_is_priv(tcp->u_arg[1])) {
+		if (verbose(tcp)) {
+			if (drm_is_driver(tcp, "i915"))
+				return drm_i915_ioctl(tcp, code, arg);
+		}
+	}
+
 	switch (code) {
 	case DRM_IOCTL_SET_VERSION:
 		return drm_set_version(tcp, arg);
