@@ -1,8 +1,6 @@
 #include "defs.h"
-#include "print_fields.h"
 
-#include <sys/param.h>
-#include <stdint.h>
+#if defined(HAVE_DRM_H) || defined(HAVE_DRM_DRM_H)
 
 #ifdef HAVE_DRM_H
 # include <drm.h>
@@ -22,9 +20,15 @@ typedef union drm_wait_vblank union_drm_wait_vblank;
 typedef struct drm_mode_get_connector struct_drm_mode_get_connector;
 typedef struct drm_mode_fb_cmd2 struct_drm_mode_fb_cmd2;
 
+#endif /* HAVE_DRM_H || HAVE_DRM_DRM_H */
+
 #define DRM_MAX_NAME_LEN 128
 
 #include MPERS_DEFS
+
+#if defined(HAVE_DRM_H) || defined(HAVE_DRM_DRM_H)
+
+#include "print_fields.h"
 
 static int
 drm_version(struct tcb *const tcp, const kernel_ulong_t arg)
@@ -199,3 +203,5 @@ MPERS_PRINTER_DECL(int, drm_ioctl_mpers, struct tcb *const tcp,
 
 	return RVAL_DECODED;
 }
+
+#endif /* HAVE_DRM_H || HAVE_DRM_DRM_H */
