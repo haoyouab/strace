@@ -7,8 +7,7 @@
 #include "defs.h"
 #include "print_fields.h"
 
-#include <sys/param.h>
-#include <stdint.h>
+#if defined(HAVE_DRM_H) || defined(HAVE_DRM_DRM_H)
 
 #ifdef HAVE_DRM_H
 # include <drm.h>
@@ -16,10 +15,12 @@
 # include <drm/drm.h>
 #endif
 
-#define DRM_MAX_NAME_LEN 128
-
-#define PRINT_IOWR(nr, size, str) \
-	tprintf("DRM_IOWR(%#x, %#x) /* %s */", nr, size, str)
+static void
+print_drm_iowr(const unsigned int nr, const unsigned int size,
+	       const char *str)
+{
+	tprintf("DRM_IOWR(%#x, %#x) /* %s */", nr, size, str);
+}
 
 static inline int
 drm_is_priv(const unsigned int num)
@@ -86,9 +87,12 @@ drm_decode_number(struct tcb *const tcp, const unsigned int code)
 	if (_IOC_DIR(code) == (_IOC_READ | _IOC_WRITE)) {
 		switch (nr) {
 			case 0xa7:
-				if (_IOC_SIZE(code) != 0x50) {
-					PRINT_IOWR(nr, _IOC_SIZE(code),
-						   "DRM_IOCTL_MODE_GETCONNECTOR");
+				/* In Linux commit v3.12-rc7~26^2~2 a u32 padding was added */
+				/* to struct drm_mode_get_connector so in old kernel headers */
+				/* the size of this structure is 0x4c instead of 0x50. */
+				if (_IOC_SIZE(code) == 0x4c) {
+					print_drm_iowr(nr, _IOC_SIZE(code),
+						       "DRM_IOCTL_MODE_GETCONNECTOR");
 					return IOCTL_NUMBER_STOP_LOOKUP;
 				} else {
 					return 0;
@@ -108,7 +112,7 @@ drm_set_version(struct tcb *const tcp, long arg)
 		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &ver))
 			return RVAL_IOCTL_DECODED;
-		PRINT_FIELD_D("write:{", ver, drm_di_major);
+		PRINT_FIELD_D("{", ver, drm_di_major);
 		PRINT_FIELD_D(", ", ver, drm_di_minor);
 		PRINT_FIELD_D(", ", ver, drm_dd_major);
 		PRINT_FIELD_D(", ", ver, drm_dd_minor);
@@ -118,7 +122,7 @@ drm_set_version(struct tcb *const tcp, long arg)
 	}
 
 	if (!syserror(tcp) && !umove(tcp, arg, &ver)) {
-		PRINT_FIELD_D(", read:{", ver, drm_di_major);
+		PRINT_FIELD_D(" => {", ver, drm_di_major);
 		PRINT_FIELD_D(", ", ver, drm_di_minor);
 		PRINT_FIELD_D(", ", ver, drm_dd_major);
 		PRINT_FIELD_D(", ", ver, drm_dd_minor);
@@ -683,12 +687,9 @@ drm_ioctl(struct tcb *const tcp, const unsigned int code,
 		return drm_mode_destroy_dumb(tcp, arg);
 	case DRM_IOCTL_GEM_CLOSE:
 		return drm_gem_close(tcp, arg);
-	default: {
-			int rc = drm_ioctl_mpers(tcp, code, arg);
-			if (rc != RVAL_DECODED)
-				return rc;
-		}
+	default:
+		return drm_ioctl_mpers(tcp, code, arg);
 	}
-
-	return 0;
 }
+
+#endif /* HAVE_DRM_H || HAVE_DRM_DRM_H */
