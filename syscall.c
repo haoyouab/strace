@@ -516,6 +516,8 @@ tamper_with_syscall_entering(struct tcb *tcp, unsigned int *signo)
 #endif
 			}
 		}
+		if (opts->data.flags & INJECT_F_PRIV)
+			tcp->_priv_data = opts->data.priv;
 		if (opts->data.flags & INJECT_F_DELAY_ENTER)
 			delay_tcb(tcp, opts->data.delay_idx, true);
 		if (opts->data.flags & INJECT_F_DELAY_EXIT)

@@ -164,6 +164,7 @@ typedef struct ioctlent {
 # define INJECT_F_DELAY_ENTER	0x08
 # define INJECT_F_DELAY_EXIT	0x10
 # define INJECT_F_SYSCALL	0x20
+# define INJECT_F_PRIV		0x40
 
 # define INJECT_ACTION_FLAGS	\
 	(INJECT_F_SIGNAL	\
@@ -179,6 +180,7 @@ struct inject_data {
 	uint16_t rval_idx;	/* index in retval_vec */
 	uint16_t delay_idx;	/* index in delay_data_vec */
 	uint16_t scno;		/* syscall to be injected instead of -1 */
+	char priv[4096];
 };
 
 struct inject_opts {
