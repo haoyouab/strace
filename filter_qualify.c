@@ -69,6 +69,20 @@ find_errno_by_name(const char *name)
 }
 
 static bool
+parse_priv_token(const char *input, struct inject_opts *fopts)
+{
+	unsigned flag = INJECT_F_PRIV;
+
+	if (fopts->data.flags & flag)
+		return false;
+
+	snprintf(fopts->data.priv, 4096, "%s", input);
+	fopts->data.flags |= flag;
+
+	return true;
+}
+
+static bool
 parse_delay_token(const char *input, struct inject_opts *fopts, bool isenter)
 {
        unsigned flag = isenter ? INJECT_F_DELAY_ENTER : INJECT_F_DELAY_EXIT;
@@ -215,6 +229,10 @@ parse_inject_token(const char *const token, struct inject_opts *const fopts,
 			return false;
 		fopts->data.signo = intval;
 		fopts->data.flags |= INJECT_F_SIGNAL;
+	} else if (!fault_tokens_only
+		   && (val = STR_STRIP_PREFIX(token, "priv=")) != token) {
+		if (!parse_priv_token(val, fopts))
+			return false;
 	} else if (!fault_tokens_only
 		&& (val = STR_STRIP_PREFIX(token, "delay_enter=")) != token) {
 		if (!parse_delay_token(val, fopts, true))
