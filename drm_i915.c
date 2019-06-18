@@ -25,15 +25,75 @@ typedef struct drm_i915_getparam struct_drm_i915_getparam;
 
 #include MPERS_DEFS
 
+static int
+i915_init(struct tcb *tcp, const unsigned int code, long arg)
+{
+	struct _drm_i915_init init;
+
+	tprints(", ");
+	if (!umove_or_printaddr(tcp, arg, &init)) {
+		PRINT_FIELD_X("{", init, func);
+		PRINT_FIELD_X(", ", init, mmio_offset);
+		PRINT_FIELD_D(", ", init, sarea_priv_offset);
+		PRINT_FIELD_U(", ", init, ring_start);
+		PRINT_FIELD_U(", ", init, ring_end);
+		PRINT_FIELD_U(", ", init, ring_size);
+		PRINT_FIELD_X(", ", init, front_offset);
+		PRINT_FIELD_X(", ", init, back_offset);
+		PRINT_FIELD_X(", ", init, depth_offset);
+		PRINT_FIELD_U(", ", init, w);
+		PRINT_FIELD_U(", ", init, h);
+		PRINT_FIELD_U(", ", init, pitch);
+		PRINT_FIELD_U(", ", init, pitch_bits);
+		PRINT_FIELD_U(", ", init, back_pitch);
+		PRINT_FIELD_U(", ", init, depth_pitch);
+		PRINT_FIELD_U(", ", init, cpp);
+		PRINT_FIELD_U(", ", init, chipset);
+		tprints("}");
+	}
+
+	return RVAL_IOCTL_DECODED;
+}
+
+static void
+drm_i915_print_clip_rect(struct drm_clip_rect *rect)
+{
+	PRINT_FIELD_U("", *rect, x1);
+	PRINT_FIELD_U(", ", *rect, y1);
+	PRINT_FIELD_U(", ", *rect, x2);
+	PRINT_FIELD_U(", ", *rect, y2);
+}
+
+static int
+i915_batchbuffer(struct tcb *tcp, const unsigned int code, long arg)
+{
+	struct drm_i915_batchbuffer batchbuffer;
+
+	tprints(", ");
+	if (!umove_or_printaddr(tcp, arg, &batchbuffer)) {
+		PRINT_FIELD_D("{", batchbuffer, start);
+		PRINT_FIELD_D(", ", batchbuffer, used);
+		PRINT_FIELD_D(", ", batchbuffer, DR1);
+		PRINT_FIELD_D(", ", batchbuffer, DR4);
+		PRINT_FIELD_D(", ", batchbuffer, num_cliprects);
+		tprints("cliprects={");
+		drm_i915_print_clip_rect(batchbuffer.cliprects);
+		tprints("}");
+	}
+
+	return RVAL_IOCTL_DECODED;
+}
+
 static int i915_getparam(struct tcb *tcp, const unsigned int code, long arg)
 {
 	struct drm_i915_getparam param;
 	int value;
 
 	if (entering(tcp)) {
+		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &param))
 			return RVAL_IOCTL_DECODED;
-		tprints(", {param=");
+		tprints("{param=");
 		printxval(drm_i915_getparams, param.param, "I915_PARAM_???");
 
 		return 0;
@@ -51,8 +111,9 @@ static int i915_getparam(struct tcb *tcp, const unsigned int code, long arg)
 		default:
 			tprintf("%d", value);
 		}
-		tprints("}");
 	}
+
+	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -61,8 +122,9 @@ static int i915_setparam(struct tcb *tcp, const unsigned int code, long arg)
 {
 	struct drm_i915_setparam param;
 
+	tprints(", ");
 	if (!umove_or_printaddr(tcp, arg, &param)) {
-		tprints(", {param=");
+		tprints("{param=");
 		printxval(drm_i915_setparams, param.param, "I915_PARAM_???");
 		tprintf(", value=%d}", param.value);
 	}
@@ -97,17 +159,20 @@ static int i915_gem_busy(struct tcb *tcp, const unsigned int code, long arg)
 	struct drm_i915_gem_busy busy;
 
 	if (entering(tcp)) {
+		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &busy))
 			return RVAL_IOCTL_DECODED;
-		tprintf(", {handle=%u", busy.handle);
+		tprintf("{handle=%u", busy.handle);
 
 		return 0;
 	}
 
 	if (!syserror(tcp) && !umove(tcp, arg, &busy)) {
-		tprintf(", busy=%c, ring=%u}",
+		tprintf(", busy=%c, ring=%u",
 			(busy.busy & 0x1) ? 'Y' : 'N', (busy.busy >> 16));
 	}
+
+	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -117,15 +182,18 @@ static int i915_gem_create(struct tcb *tcp, const unsigned int code, long arg)
 	struct drm_i915_gem_create create;
 
 	if (entering(tcp)) {
+		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &create))
 			return RVAL_IOCTL_DECODED;
-		tprintf(", {size=%Lu", create.size);
+		tprintf("{size=%Lu", create.size);
 
 		return 0;
 	}
 
 	if (!syserror(tcp) && !umove(tcp, arg, &create))
-		tprintf(", handle=%u}", create.handle);
+		tprintf(", handle=%u", create.handle);
+
+	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -180,6 +248,7 @@ static int i915_gem_mmap(struct tcb *tcp, const unsigned int code, long arg)
 		PRINT_FIELD_U(", ", mmap, offset);
 		PRINT_FIELD_PTR(", ", mmap, addr_ptr);
 	}
+
 	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
@@ -191,15 +260,18 @@ static int i915_gem_mmap_gtt(struct tcb *tcp, const unsigned int code, long arg)
 
 
 	if (entering(tcp)) {
+		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &mmap))
 			return RVAL_IOCTL_DECODED;
-		tprintf(", {handle=%u", mmap.handle);
+		tprintf("{handle=%u", mmap.handle);
 
 		return 0;
 	}
 
 	if (!syserror(tcp) && !umove(tcp, arg, &mmap))
-		tprintf(", offset=%Lu}", mmap.offset);
+		tprintf(", offset=%Lu", mmap.offset);
+
+	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -210,10 +282,11 @@ static int i915_gem_set_domain(struct tcb *tcp, const unsigned int code,
 	struct drm_i915_gem_set_domain dom;
 
 	if (entering(tcp)) {
+		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &dom))
 			return RVAL_IOCTL_DECODED;
 
-		tprintf(", {handle=%u, read_domains=%x, write_domain=%x}",
+		tprintf("{handle=%u, read_domains=%x, write_domain=%x}",
 			dom.handle, dom.read_domains, dom.write_domain);
 	}
 
@@ -225,15 +298,18 @@ static int i915_gem_madvise(struct tcb *tcp, const unsigned int code, long arg)
 	struct drm_i915_gem_madvise madv;
 
 	if (entering(tcp)) {
+		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &madv))
 			return RVAL_IOCTL_DECODED;
-		tprintf(", {handle=%u, madv=%u", madv.handle, madv.madv);
+		tprintf("{handle=%u, madv=%u", madv.handle, madv.madv);
 
 		return 0;
 	}
 
 	if (!syserror(tcp) && !umove(tcp, arg, &madv))
-		tprintf(", retained=%u}", madv.retained);
+		tprintf(", retained=%u", madv.retained);
+
+	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -244,17 +320,20 @@ static int i915_gem_get_tiling(struct tcb *tcp, const unsigned int code,
 	struct drm_i915_gem_get_tiling tiling;
 
 	if (entering(tcp)) {
+		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &tiling))
 			return RVAL_IOCTL_DECODED;
-		tprintf(", {handle=%u", tiling.handle);
+		tprintf("{handle=%u", tiling.handle);
 
 		return 0;
 	}
 
 	if (!syserror(tcp) && !umove(tcp, arg, &tiling)) {
-		tprintf(", tiling_mode=%u, swizzle_mode=%u}",
+		tprintf(", tiling_mode=%u, swizzle_mode=%u",
 			tiling.tiling_mode, tiling.swizzle_mode);
 	}
+
+	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -265,16 +344,19 @@ static int i915_gem_set_tiling(struct tcb *tcp, const unsigned int code,
 	struct drm_i915_gem_set_tiling tiling;
 
 	if (entering(tcp)) {
+		tprints(", ");
 		if (umove(tcp, arg, &tiling))
 			return RVAL_IOCTL_DECODED;
-		tprintf(", {handle=%u, tiling_mode=%u, stride=%u",
+		tprintf("{handle=%u, tiling_mode=%u, stride=%u",
 			tiling.handle, tiling.tiling_mode, tiling.stride);
 
 		return 0;
 	}
 
 	if (!syserror(tcp) && !umove(tcp, arg, &tiling))
-		tprintf(", swizzle_mode=%u}", tiling.swizzle_mode);
+		tprintf(", swizzle_mode=%u", tiling.swizzle_mode);
+
+	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -297,6 +379,7 @@ static int i915_gem_userptr(struct tcb *tcp, const unsigned int code, long arg)
 		PRINT_FIELD_X(", ", uptr, flags);
 		PRINT_FIELD_U(", ", uptr, handle);
 	}
+
 	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
@@ -317,6 +400,10 @@ MPERS_PRINTER_DECL(int, drm_i915_decode_number, struct tcb *tcp, unsigned int ar
 MPERS_PRINTER_DECL(int, drm_i915_ioctl, struct tcb *tcp, const unsigned int code, long arg)
 {
 	switch (code) {
+	case DRM_IOCTL_I915_INIT:
+		return i915_init(tcp, code, arg);
+	case DRM_IOCTL_I915_BATCHBUFFER:
+		return i915_batchbuffer(tcp, code, arg);
 	case DRM_IOCTL_I915_GETPARAM:
 		return i915_getparam(tcp, code, arg);
 	case DRM_IOCTL_I915_SETPARAM:
@@ -345,7 +432,7 @@ MPERS_PRINTER_DECL(int, drm_i915_ioctl, struct tcb *tcp, const unsigned int code
 		return i915_gem_set_tiling(tcp, code, arg);
 	case DRM_IOCTL_I915_GEM_USERPTR:
 		return i915_gem_userptr(tcp, code, arg);
+	default:
+		return RVAL_DECODED;
 	}
-
-	return RVAL_DECODED;
 }
