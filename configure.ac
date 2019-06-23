@@ -897,10 +897,10 @@ st_STACKTRACE
 
 PKG_CHECK_MODULES([LIBDRM], [libdrm],
 		  [CPPFLAGS="$CPPFLAGS $LIBDRM_CFLAGS"
-		   AC_CHECK_HEADERS([drm.h], [
+		   AC_CHECK_HEADERS([drm.h i915_drm.h], [
 			AC_CHECK_MEMBERS([struct drm_mode_fb_cmd2.modifier],,, [#include <drm.h>])
 		   ])],
-		  [AC_CHECK_HEADERS([drm/drm.h], [
+		  [AC_CHECK_HEADERS([drm/drm.h drm/i915_drm.h], [
 			AC_CHECK_MEMBERS([struct drm_mode_fb_cmd2.modifier],,, [#include <drm/drm.h>])
 		  ])])
 

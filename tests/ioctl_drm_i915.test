@@ -1,0 +1,14 @@
+#!/bin/sh -efu
+#
+# Copyright (c) 2018 The strace developers.
+# All rights reserved.
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+. "${srcdir=.}/scno_tampering.sh"
+
+run_prog
+run_strace -a16 -e trace=ioctl \
+	-e inject=ioctl:priv=i915 ../ioctl_drm_i915 > "$EXP"
+grep -v '^ioctl([012][,<]' < "$LOG" > "$OUT"
+match_diff "$OUT" "$EXP"

@@ -7,26 +7,30 @@
 #include "defs.h"
 #include "print_fields.h"
 
-#ifdef HAVE_DRM_H
-#include <drm.h>
-#include <i915_drm.h>
-#else
-#include <drm/drm.h>
-#include <drm/i915_drm.h>
-#endif
+#if defined(HAVE_I915_DRM_H) || defined(HAVE_DRM_I915_DRM_H)
 
-#include "xlat/drm_i915_ioctls.h"
-#include "xlat/drm_i915_getparams.h"
-#include "xlat/drm_i915_setparams.h"
+# ifdef HAVE_I915_DRM_H
+#  include <i915_drm.h>
+# else
+#  include <drm/i915_drm.h>
+# endif
+
+# include "xlat/drm_i915_ioctls.h"
+# include "xlat/drm_i915_getparams.h"
+# include "xlat/drm_i915_setparams.h"
 
 #include DEF_MPERS_TYPE(struct_drm_i915_getparam)
 
 typedef struct drm_i915_getparam struct_drm_i915_getparam;
 
+#endif /* HAVE_I915_DRM_H || HAVE_DRM_I915_DRM_H */
+
 #include MPERS_DEFS
 
+#if defined(HAVE_I915_DRM_H) || defined(HAVE_DRM_I915_DRM_H)
+
 static int
-i915_init(struct tcb *tcp, const unsigned int code, long arg)
+i915_init(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct _drm_i915_init init;
 
@@ -65,7 +69,7 @@ drm_i915_print_clip_rect(struct drm_clip_rect *rect)
 }
 
 static int
-i915_batchbuffer(struct tcb *tcp, const unsigned int code, long arg)
+i915_batchbuffer(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_batchbuffer batchbuffer;
 
@@ -84,10 +88,11 @@ i915_batchbuffer(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_getparam(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_getparam(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_getparam param;
-	int value;
+	long value;
 
 	if (entering(tcp)) {
 		tprints(", ");
@@ -100,16 +105,15 @@ static int i915_getparam(struct tcb *tcp, const unsigned int code, long arg)
 	}
 
 	if (!syserror(tcp) && !umove(tcp, arg, &param)) {
-		if (umove(tcp, (long)param.value, &value))
-			return RVAL_IOCTL_DECODED;
-
-		tprints(", value=");
-		switch (param.param) {
-		case I915_PARAM_CHIPSET_ID:
-			tprintf("0x%04x", value);
-			break;
-		default:
-			tprintf("%d", value);
+		if (!umove(tcp, (long)param.value, &value)) {
+			tprints(", value=");
+			switch (param.param) {
+			case I915_PARAM_CHIPSET_ID:
+				tprintf("%#04lx", value);
+				break;
+			default:
+				tprintf("%ld", value);
+			}
 		}
 	}
 
@@ -118,7 +122,8 @@ static int i915_getparam(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_setparam(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_setparam(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_setparam param;
 
@@ -132,8 +137,9 @@ static int i915_setparam(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_execbuffer2(struct tcb *tcp, const unsigned int code,
-				long arg)
+static int
+i915_gem_execbuffer2(struct tcb *const tcp,
+				const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_execbuffer2 eb;
 
@@ -154,7 +160,8 @@ static int i915_gem_execbuffer2(struct tcb *tcp, const unsigned int code,
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_busy(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_gem_busy(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_busy busy;
 
@@ -177,7 +184,8 @@ static int i915_gem_busy(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_create(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_gem_create(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_create create;
 
@@ -198,7 +206,8 @@ static int i915_gem_create(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_pread(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_gem_pread(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_pread pr;
 
@@ -214,7 +223,8 @@ static int i915_gem_pread(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_pwrite(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_gem_pwrite(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_pwrite pw;
 
@@ -230,7 +240,8 @@ static int i915_gem_pwrite(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_mmap(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_gem_mmap(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_mmap mmap;
 
@@ -254,7 +265,8 @@ static int i915_gem_mmap(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_mmap_gtt(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_gem_mmap_gtt(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_mmap_gtt mmap;
 
@@ -276,8 +288,9 @@ static int i915_gem_mmap_gtt(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_set_domain(struct tcb *tcp, const unsigned int code,
-			       long arg)
+static int
+i915_gem_set_domain(struct tcb *const tcp,
+			       const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_set_domain dom;
 
@@ -293,7 +306,8 @@ static int i915_gem_set_domain(struct tcb *tcp, const unsigned int code,
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_madvise(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_gem_madvise(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_madvise madv;
 
@@ -314,8 +328,9 @@ static int i915_gem_madvise(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_get_tiling(struct tcb *tcp, const unsigned int code,
-			       long arg)
+static int
+i915_gem_get_tiling(struct tcb *const tcp,
+			       const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_get_tiling tiling;
 
@@ -338,8 +353,9 @@ static int i915_gem_get_tiling(struct tcb *tcp, const unsigned int code,
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_set_tiling(struct tcb *tcp, const unsigned int code,
-			       long arg)
+static int
+i915_gem_set_tiling(struct tcb *const tcp,
+			       const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_set_tiling tiling;
 
@@ -361,7 +377,8 @@ static int i915_gem_set_tiling(struct tcb *tcp, const unsigned int code,
 	return RVAL_IOCTL_DECODED;
 }
 
-static int i915_gem_userptr(struct tcb *tcp, const unsigned int code, long arg)
+static int
+i915_gem_userptr(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_i915_gem_userptr uptr;
 
@@ -385,7 +402,8 @@ static int i915_gem_userptr(struct tcb *tcp, const unsigned int code, long arg)
 	return RVAL_IOCTL_DECODED;
 }
 
-MPERS_PRINTER_DECL(int, drm_i915_decode_number, struct tcb *tcp, unsigned int arg)
+MPERS_PRINTER_DECL(int, drm_i915_decode_number, struct tcb *const tcp,
+		   const kernel_ulong_t arg)
 {
 	const char *str = xlookup(drm_i915_ioctls, arg);
 
@@ -397,44 +415,47 @@ MPERS_PRINTER_DECL(int, drm_i915_decode_number, struct tcb *tcp, unsigned int ar
 	return 0;
 }
 
-MPERS_PRINTER_DECL(int, drm_i915_ioctl, struct tcb *tcp, const unsigned int code, long arg)
+MPERS_PRINTER_DECL(int, drm_i915_ioctl, struct tcb *const tcp,
+		   const unsigned int code, const kernel_ulong_t arg)
 {
 	switch (code) {
 	case DRM_IOCTL_I915_INIT:
-		return i915_init(tcp, code, arg);
+		return i915_init(tcp, arg);
 	case DRM_IOCTL_I915_BATCHBUFFER:
-		return i915_batchbuffer(tcp, code, arg);
+		return i915_batchbuffer(tcp, arg);
 	case DRM_IOCTL_I915_GETPARAM:
-		return i915_getparam(tcp, code, arg);
+		return i915_getparam(tcp, arg);
 	case DRM_IOCTL_I915_SETPARAM:
-		return i915_setparam(tcp, code, arg);
+		return i915_setparam(tcp, arg);
 	case DRM_IOCTL_I915_GEM_EXECBUFFER2:
-		return i915_gem_execbuffer2(tcp, code, arg);
+		return i915_gem_execbuffer2(tcp, arg);
 	case DRM_IOCTL_I915_GEM_BUSY:
-		return i915_gem_busy(tcp, code, arg);
+		return i915_gem_busy(tcp, arg);
 	case DRM_IOCTL_I915_GEM_CREATE:
-		return i915_gem_create(tcp, code, arg);
+		return i915_gem_create(tcp, arg);
 	case DRM_IOCTL_I915_GEM_PREAD:
-		return i915_gem_pread(tcp, code, arg);
+		return i915_gem_pread(tcp, arg);
 	case DRM_IOCTL_I915_GEM_PWRITE:
-		return i915_gem_pwrite(tcp, code, arg);
+		return i915_gem_pwrite(tcp, arg);
 	case DRM_IOCTL_I915_GEM_MMAP:
-		return i915_gem_mmap(tcp, code, arg);
+		return i915_gem_mmap(tcp, arg);
 	case DRM_IOCTL_I915_GEM_MMAP_GTT:
-		return i915_gem_mmap_gtt(tcp, code, arg);
+		return i915_gem_mmap_gtt(tcp, arg);
 	case DRM_IOCTL_I915_GEM_SET_DOMAIN:
-		return i915_gem_set_domain(tcp, code, arg);
+		return i915_gem_set_domain(tcp, arg);
 	case DRM_IOCTL_I915_GEM_MADVISE:
-		return i915_gem_madvise(tcp, code, arg);
+		return i915_gem_madvise(tcp, arg);
 	case DRM_IOCTL_I915_GEM_GET_TILING:
-		return i915_gem_get_tiling(tcp, code, arg);
+		return i915_gem_get_tiling(tcp, arg);
 	case DRM_IOCTL_I915_GEM_SET_TILING:
-		return i915_gem_set_tiling(tcp, code, arg);
+		return i915_gem_set_tiling(tcp, arg);
 	case DRM_IOCTL_I915_GEM_USERPTR:
-		return i915_gem_userptr(tcp, code, arg);
+		return i915_gem_userptr(tcp, arg);
 	default:
 		tprints(", ");
 		printaddr(arg);
 		return RVAL_IOCTL_DECODED;
 	}
 }
+
+#endif /* HAVE_I915_DRM_H || HAVE_DRM_I915_DRM_H */

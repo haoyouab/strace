@@ -97,6 +97,8 @@ check_PROGRAMS = $(PURE_EXECUTABLES) \
 	inject-nf \
 	int_0x80 \
 	ioctl_dm-v \
+	ioctl_drm_i915 \
+	ioctl_drm_i915-success \
 	ioctl_drm-success \
 	ioctl_evdev-success \
 	ioctl_evdev-success-v \

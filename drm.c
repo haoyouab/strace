@@ -9,11 +9,13 @@
 
 #if defined(HAVE_DRM_H) || defined(HAVE_DRM_DRM_H)
 
-#ifdef HAVE_DRM_H
-# include <drm.h>
-#else
-# include <drm/drm.h>
-#endif
+# ifdef HAVE_DRM_H
+#  include <drm.h>
+# else
+#  include <drm/drm.h>
+# endif
+
+# define DRM_MAX_NAME_LEN 128
 
 static void
 print_drm_iowr(const unsigned int nr, const unsigned int size,
@@ -79,8 +81,10 @@ drm_decode_number(struct tcb *const tcp, const unsigned int code)
 
 	if (drm_is_priv(tcp->u_arg[1])) {
 		if (verbose(tcp)) {
+# if defined(HAVE_I915_DRM_H) || defined(HAVE_DRM_I915_DRM_H)
 			if (drm_is_driver(tcp, "i915"))
 				return drm_i915_decode_number(tcp, code);
+# endif
 		}
 	}
 
@@ -104,7 +108,7 @@ drm_decode_number(struct tcb *const tcp, const unsigned int code)
 }
 
 static int
-drm_set_version(struct tcb *const tcp, long arg)
+drm_set_version(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_set_version ver;
 
@@ -133,7 +137,7 @@ drm_set_version(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_get_magic(struct tcb *const tcp, long arg)
+drm_get_magic(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_auth auth;
 
@@ -152,7 +156,7 @@ drm_get_magic(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_get_resources(struct tcb *const tcp, long arg)
+drm_mode_get_resources(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_card_res res;
 
@@ -202,7 +206,7 @@ drm_mode_print_modeinfo(struct drm_mode_modeinfo *info)
 }
 
 static int
-drm_mode_get_crtc(struct tcb *const tcp, long arg)
+drm_mode_get_crtc(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_crtc crtc;
 
@@ -235,7 +239,7 @@ drm_mode_get_crtc(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_set_crtc(struct tcb *const tcp, long arg)
+drm_mode_set_crtc(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_crtc crtc;
 
@@ -262,7 +266,7 @@ drm_mode_set_crtc(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_cursor(struct tcb *const tcp, long arg)
+drm_mode_cursor(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_cursor cursor;
 
@@ -285,7 +289,7 @@ drm_mode_cursor(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_cursor2(struct tcb *const tcp, long arg)
+drm_mode_cursor2(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_cursor2 cursor;
 
@@ -310,7 +314,7 @@ drm_mode_cursor2(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_get_gamma(struct tcb *const tcp, long arg)
+drm_mode_get_gamma(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_crtc_lut lut;
 
@@ -332,7 +336,7 @@ drm_mode_get_gamma(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_set_gamma(struct tcb *const tcp, long arg)
+drm_mode_set_gamma(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_crtc_lut lut;
 
@@ -354,7 +358,7 @@ drm_mode_set_gamma(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_get_encoder(struct tcb *const tcp, long arg)
+drm_mode_get_encoder(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_get_encoder enc;
 
@@ -381,7 +385,7 @@ drm_mode_get_encoder(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_get_property(struct tcb *const tcp, long arg)
+drm_mode_get_property(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_get_property prop;
 
@@ -409,7 +413,7 @@ drm_mode_get_property(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_set_property(struct tcb *const tcp, long arg)
+drm_mode_set_property(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_connector_set_property prop;
 
@@ -425,7 +429,7 @@ drm_mode_set_property(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_get_prop_blob(struct tcb *const tcp, long arg)
+drm_mode_get_prop_blob(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_get_blob blob;
 
@@ -449,7 +453,7 @@ drm_mode_get_prop_blob(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_add_fb(struct tcb *const tcp, long arg)
+drm_mode_add_fb(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_fb_cmd cmd;
 
@@ -477,7 +481,7 @@ drm_mode_add_fb(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_get_fb(struct tcb *const tcp, long arg)
+drm_mode_get_fb(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_fb_cmd cmd;
 
@@ -505,7 +509,7 @@ drm_mode_get_fb(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_rm_fb(struct tcb *const tcp, long arg)
+drm_mode_rm_fb(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	unsigned int handle;
 
@@ -517,7 +521,7 @@ drm_mode_rm_fb(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_page_flip(struct tcb *const tcp, long arg)
+drm_mode_page_flip(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_crtc_page_flip flip;
 
@@ -534,7 +538,7 @@ drm_mode_page_flip(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_dirty_fb(struct tcb *const tcp, long arg)
+drm_mode_dirty_fb(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_fb_dirty_cmd cmd;
 
@@ -552,7 +556,7 @@ drm_mode_dirty_fb(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_create_dumb(struct tcb *const tcp, long arg)
+drm_mode_create_dumb(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_create_dumb dumb;
 
@@ -580,7 +584,7 @@ drm_mode_create_dumb(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_map_dumb(struct tcb *const tcp, long arg)
+drm_mode_map_dumb(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_map_dumb dumb;
 
@@ -603,7 +607,7 @@ drm_mode_map_dumb(struct tcb *const tcp, long arg)
 }
 
 static int
-drm_mode_destroy_dumb(struct tcb *const tcp, const unsigned int long arg)
+drm_mode_destroy_dumb(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_destroy_dumb dumb;
 
@@ -617,7 +621,7 @@ drm_mode_destroy_dumb(struct tcb *const tcp, const unsigned int long arg)
 }
 
 static int
-drm_gem_close(struct tcb *const tcp, const unsigned int long arg)
+drm_gem_close(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_gem_close close;
 
@@ -637,16 +641,89 @@ drm_ioctl(struct tcb *const tcp, const unsigned int code,
 	/* Check for device specific ioctls */
 	if (drm_is_priv(tcp->u_arg[1])) {
 		if (verbose(tcp)) {
+# if defined(HAVE_I915_DRM_H) || defined(HAVE_DRM_I915_DRM_H)
 			if (drm_is_driver(tcp, "i915"))
 				return drm_i915_ioctl(tcp, code, arg);
+# endif
 		}
 	}
 
 	switch (code) {
-	case DRM_IOCTL_SET_VERSION:
-		return drm_set_version(tcp, arg);
-	case DRM_IOCTL_GET_MAGIC:
+	case DRM_IOCTL_GET_MAGIC: /* R */
 		return drm_get_magic(tcp, arg);
+	case DRM_IOCTL_IRQ_BUSID: /* RW */
+		return drm_irq_busid(tcp, arg);//
+	case DRM_IOCTL_GET_MAP(tcp, arg): /* RW */
+		return drm_get_map(tcp, arg);//
+	case DRM_IOCTL_GET_CLIENT: /* RW */
+		return drm_get_client(tcp, arg);//
+	case DRM_IOCTL_GET_STATS: /* R */
+		return drm_get_stats(tcp, arg);//
+	case DRM_IOCTL_SET_VERSION: /* RW */
+		return drm_set_version(tcp, arg);
+	case DRM_IOCTL_MODESET_CTL: /* W */
+		return drm_modeset_ctl(tcp, arg);//
+	case DRM_IOCTL_GEM_CLOSE: /* W */
+		return drm_gem_close(tcp, arg);
+	case DRM_IOCTL_GEM_FLINK: /* RW */
+		return drm_gem_flink(tcp, arg);//
+	case DRM_IOCTL_GEM_OPEN: /* RW */
+		return drm_gem_open(tcp, arg);//
+	case DRM_IOCTL_GET_CAP: /* RW */
+		return drm_get_cap(tcp, arg);//
+	case DRM_IOCTL_SET_CLIENT_CAP: /* W */
+		return drm_set_client_cap(tcp, arg);//
+	case DRM_IOCTL_SET_UNIQUE: /* W */
+		return drm_set_unique(tcp, arg);//
+	case DRM_IOCTL_AUTH_MAGIC: /* W */
+		return drm_auth_magic(tcp, arg);//
+	case DRM_IOCTL_BLOCK: /* RW */
+		return drm_block(tcp, arg);//
+	case DRM_IOCTL_UNBLOCK: /* RW */
+		return drm_unblock(tcp, arg);//
+	case DRM_IOCTL_CONTROL: /* W */
+		return drm_control(tcp, arg);//
+	case DRM_IOCTL_ADD_MAP: /* RW */
+		return drm_add_map(tcp, arg);//
+	case DRM_IOCTL_ADD_BUFS: /* RW */
+		return drm_add_bufs(tcp, arg);//
+	case DRM_IOCTL_MARK_BUFS: /* W */
+		return drm_mark_bufs(tcp, arg);//
+	case DRM_IOCTL_INFO_BUFS: /* RW */
+		return drm_info_bufs(tcp, arg);//
+	case DRM_IOCTL_MAP_BUFS: /* RW */
+		return drm_map_bufs(tcp, arg);//
+	case DRM_IOCTL_FREE_BUFS: /* W */
+		return drm_free_bufs(tcp, arg);//
+	case DRM_IOCTL_RM_MAP: /* W */
+		return drm_rm_map(tcp, arg);//
+	case DRM_IOCTL_ADD_CTX: /* RW */
+	case DRM_IOCTL_RM_CTX: /* RW */
+	case DRM_IOCTL_MOD_CTX: /* W */
+	case DRM_IOCTL_GET_CTX: /* RW */
+	case DRM_IOCTL_SWTICH_CTX: /* W */
+	case DRM_IOCTL_NEW_CTX: /* W */
+		return drm_ctx(tcp, arg);//
+	case DRM_IOCTL_RES_CTX: /* RW */
+		return drm_res_ctx(tcp, arg);//
+	case DRM_IOCTL_ADD_DRAW: /* RW */
+		return drm_add_draw(tcp, arg);//
+	case DRM_IOCTL_RM_DRAW: /* RW */
+		return drm_rm_draw(tcp, arg);//
+	case DRM_IOCTL_DMA: /* RW */
+		return drm_dma(tcp, arg);//
+	case DRM_IOCTL_LOCK: /* W */
+		return drm_lock(tcp, arg);//
+	case DRM_IOCTL_LOCK: /* W */
+		return drm_lock(tcp, arg);//
+	case DRM_IOCTL_UNLOCK: /* W */
+		return drm_unlock(tcp, arg);//
+	case DRM_IOCTL_FINISH: /* W */
+		return drm_finish(tcp, arg);//
+	case DRM_IOCTL_PRIME_HANDLE_TO_FD: /* RW */
+		return drm_prime_handle_to_fd(tcp, arg);//
+	case DRM_IOCTL_PRIME_FD_TO_HANDLE: /* RW */
+		return drm_prime_fd_to_handle(tcp, arg);//
 	case DRM_IOCTL_MODE_GETRESOURCES:
 		return drm_mode_get_resources(tcp, arg);
 	case DRM_IOCTL_MODE_GETCRTC:
@@ -685,8 +762,6 @@ drm_ioctl(struct tcb *const tcp, const unsigned int code,
 		return drm_mode_map_dumb(tcp, arg);
 	case DRM_IOCTL_MODE_DESTROY_DUMB:
 		return drm_mode_destroy_dumb(tcp, arg);
-	case DRM_IOCTL_GEM_CLOSE:
-		return drm_gem_close(tcp, arg);
 	default:
 		return drm_ioctl_mpers(tcp, code, arg);
 	}

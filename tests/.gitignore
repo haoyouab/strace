@@ -151,6 +151,8 @@ ioctl_block
 ioctl_dm
 ioctl_dm-v
 ioctl_drm
+ioctl_drm_i915
+ioctl_drm_i915-success
 ioctl_drm-success
 ioctl_evdev
 ioctl_evdev-success

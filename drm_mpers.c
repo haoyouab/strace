@@ -22,8 +22,6 @@ typedef struct drm_mode_fb_cmd2 struct_drm_mode_fb_cmd2;
 
 #endif /* HAVE_DRM_H || HAVE_DRM_DRM_H */
 
-#define DRM_MAX_NAME_LEN 128
-
 #include MPERS_DEFS
 
 #if defined(HAVE_DRM_H) || defined(HAVE_DRM_DRM_H)
@@ -187,9 +185,9 @@ MPERS_PRINTER_DECL(int, drm_ioctl_mpers, struct tcb *const tcp,
 		   const unsigned int code, const kernel_ulong_t arg)
 {
 	switch (code) {
-	case DRM_IOCTL_VERSION:
+	case DRM_IOCTL_VERSION: /* RW */
 		return drm_version(tcp, arg);
-	case DRM_IOCTL_GET_UNIQUE:
+	case DRM_IOCTL_GET_UNIQUE: /* RW */
 		return drm_get_unique(tcp, arg);
 	case DRM_IOCTL_WAIT_VBLANK:
 		return drm_wait_vblank(tcp, arg);
