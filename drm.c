@@ -85,6 +85,10 @@ drm_decode_number(struct tcb *const tcp, const unsigned int code)
 			if (drm_is_driver(tcp, "i915"))
 				return drm_i915_decode_number(tcp, code);
 # endif
+# if defined(HAVE_AMDGPU_DRM_H) || defined(HAVE_DRM_AMDGPU_DRM_H)
+			if (drm_is_driver(tcp, "amdgpu"))
+				return drm_amdgpu_decode_number(tcp, code);
+# endif
 		}
 	}
 
@@ -1446,6 +1450,10 @@ drm_ioctl(struct tcb *const tcp, const unsigned int code,
 # if defined(HAVE_I915_DRM_H) || defined(HAVE_DRM_I915_DRM_H)
 			if (drm_is_driver(tcp, "i915"))
 				return drm_i915_ioctl(tcp, code, arg);
+# endif
+# if defined(HAVE_AMDGPU_DRM_H) || defined(HAVE_DRM_AMDGPU_DRM_H)
+			if (drm_is_driver(tcp, "amdgpu"))
+				return drm_amdgpu_ioctl(tcp, code, arg);
 # endif
 		}
 	}

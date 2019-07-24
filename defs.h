@@ -1004,6 +1004,8 @@ DECL_IOCTL(uffdio);
 extern int decode_sg_io_v4(struct tcb *, const kernel_ulong_t arg);
 extern void print_evdev_ff_type(const kernel_ulong_t val);
 extern int drm_decode_number(struct tcb *, const unsigned int code);
+extern int drm_amdgpu_decode_number(struct tcb *, const kernel_ulong_t arg);
+extern int drm_amdgpu_ioctl(struct tcb *, const unsigned int code, const kernel_ulong_t arg);
 
 struct nlmsghdr;
 

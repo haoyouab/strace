@@ -897,11 +897,17 @@ st_STACKTRACE
 
 PKG_CHECK_MODULES([LIBDRM], [libdrm],
 		  [CPPFLAGS="$CPPFLAGS $LIBDRM_CFLAGS"
-		   AC_CHECK_HEADERS([drm.h i915_drm.h], [
+		   AC_CHECK_HEADERS([drm.h i915_drm.h amdgpu_drm.h], [
 			AC_CHECK_MEMBERS([struct drm_mode_fb_cmd2.modifier],,, [#include <drm.h>])
+			AC_CHECK_MEMBERS([struct drm_amdgpu_ctx_in.priority],,, [#include <amdgpu_drm.h>])
+			AC_CHECK_MEMBERS([struct drm_amdgpu_sched_in.flags],,, [#include <amdgpu_drm.h>])
+			AC_CHECK_MEMBERS([struct drm_amdgpu_sched_in.ctx_id],,, [#include <amdgpu_drm.h>])
 		   ])],
-		  [AC_CHECK_HEADERS([drm/drm.h drm/i915_drm.h], [
+		  [AC_CHECK_HEADERS([drm/drm.h drm/i915_drm.h drm/amdgpu_drm.h], [
 			AC_CHECK_MEMBERS([struct drm_mode_fb_cmd2.modifier],,, [#include <drm/drm.h>])
+			AC_CHECK_MEMBERS([struct drm_amdgpu_ctx_in.priority],,, [#include <drm/amdgpu_drm.h>])
+			AC_CHECK_MEMBERS([struct drm_amdgpu_sched_in.flags],,, [#include <amdgpu_drm.h>])
+			AC_CHECK_MEMBERS([struct drm_amdgpu_sched_in.ctx_id],,, [#include <amdgpu_drm.h>])
 		  ])])
 
 if test "$arch" = mips && test "$no_create" != yes; then

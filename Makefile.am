@@ -104,6 +104,7 @@ strace_SOURCES =	\
 	drm.c		\
 	drm_mpers.c	\
 	drm_i915.c	\
+	drm_amdgpu.c	\
 	dyxlat.c	\
 	empty.h		\
 	epoll.c		\
