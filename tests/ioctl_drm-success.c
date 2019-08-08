@@ -1,42 +1,51 @@
 #include "tests.h"
 
-#include <errno.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include "print_fields.h"
+#if defined(HAVE_DRM_H) || defined(HAVE_DRM_DRM_H)
 
-#include <drm/drm.h>
+# include <errno.h>
+# include <fcntl.h>
+# include <inttypes.h>
+# include <stdio.h>
+# include <stdlib.h>
+# include <string.h>
+# include <sys/ioctl.h>
+# include "print_fields.h"
 
-#include "xlat.h"
-#include "xlat/drm_buf_desc_flags.h"
-#include "xlat/drm_capability.h"
-#include "xlat/drm_client_capability.h"
-#include "xlat/drm_control_func.h"
-#include "xlat/drm_crtc_sequence_flags.h"
-#include "xlat/drm_ctx_flags.h"
-#include "xlat/drm_lock_flags.h"
-#include "xlat/drm_map_flags.h"
-#include "xlat/drm_map_type.h"
-#include "xlat/drm_modeset_cmd.h"
-#include "xlat/drm_mode_atomic_flags.h"
-#include "xlat/drm_mode_create_lease_flags.h"
-#include "xlat/drm_mode_cursor_flags.h"
-#include "xlat/drm_mode_encoder_type.h"
-#include "xlat/drm_mode_fb_cmd2_flags.h"
-#include "xlat/drm_mode_fb_dirty_cmd_flags.h"
-#include "xlat/drm_mode_flags.h"
-#include "xlat/drm_mode_get_property_flags.h"
-#include "xlat/drm_mode_page_flip_flags.h"
-#include "xlat/drm_mode_set_plane_flags.h"
-#include "xlat/drm_mode_type.h"
-#include "xlat/drm_prime_handle_flags.h"
-#include "xlat/drm_syncobj_flags.h"
-#include "xlat/drm_syncobj_handle_flags.h"
-#include "xlat/drm_syncobj_wait_flags.h"
-#include "xlat/drm_vblank_seq_type.h"
+# ifdef HAVE_DRM_H
+#  include <drm.h>
+# else
+#  include <drm/drm.h>
+# endif
+
+# include "xlat.h"
+# include "xlat/drm_buf_desc_flags.h"
+# include "xlat/drm_capability.h"
+# include "xlat/drm_client_capability.h"
+# include "xlat/drm_control_func.h"
+# include "xlat/drm_crtc_sequence_flags.h"
+# include "xlat/drm_ctx_flags.h"
+# include "xlat/drm_lock_flags.h"
+# include "xlat/drm_map_flags.h"
+# include "xlat/drm_map_type.h"
+# include "xlat/drm_modeset_cmd.h"
+# include "xlat/drm_mode_atomic_flags.h"
+# include "xlat/drm_mode_create_lease_flags.h"
+# include "xlat/drm_mode_cursor_flags.h"
+# include "xlat/drm_mode_encoder_type.h"
+# include "xlat/drm_mode_fb_cmd2_flags.h"
+# include "xlat/drm_mode_fb_dirty_cmd_flags.h"
+# include "xlat/drm_mode_flags.h"
+# include "xlat/drm_mode_get_property_flags.h"
+# include "xlat/drm_mode_page_flip_flags.h"
+# include "xlat/drm_mode_set_plane_flags.h"
+# include "xlat/drm_mode_type.h"
+# include "xlat/drm_prime_handle_flags.h"
+# include "xlat/drm_syncobj_fd_to_handle_flags.h"
+# include "xlat/drm_syncobj_flags.h"
+# include "xlat/drm_syncobj_handle_to_fd_flags.h"
+# include "xlat/drm_syncobj_wait_flags.h"
+# include "xlat/drm_vblank_seq_type.h"
+# include "xlat/drm_vblank_seq_type_flags.h"
 
 
 static const unsigned int magic = 0xdeadbeef;
@@ -53,6 +62,15 @@ struct drm_check {
 struct drm_mode_rm_fb_wrap {
 	unsigned int fb_id;
 };
+
+static void
+printaddr64(uint64_t addr)
+{
+	if (!addr)
+		printf("NULL");
+	else
+		printf("%#" PRIx64, addr);
+}
 
 static long
 invoke_test_syscall(unsigned long cmd, void *p)
@@ -674,13 +692,25 @@ print_drm_wait_vblank(long rc, void *ptr, void *arg)
 		return;
 	}
 	printf("{request={type=");
-	printxval(drm_vblank_seq_type, vblank->request.type, "_DRM_VBLANK_???");
+	printxval(drm_vblank_seq_type,
+		  vblank->request.type & _DRM_VBLANK_TYPES_MASK,
+		  "_DRM_VBLANK_???");
+	printf(", type.flags=");
+	printflags(drm_vblank_seq_type_flags,
+		   vblank->request.type & _DRM_VBLANK_FLAGS_MASK,
+		   "_DRM_VBLANK_???");
 	PRINT_FIELD_U(", ", vblank->request, sequence);
 	PRINT_FIELD_U(", ", vblank->request, signal);
 	printf("}");
 
 	printf(", {reply={type=");
-	printxval(drm_vblank_seq_type, vblank->reply.type, "_DRM_VBLANK_???");
+	printxval(drm_vblank_seq_type,
+		  vblank->reply.type & _DRM_VBLANK_TYPES_MASK,
+		  "_DRM_VBLANK_???");
+	printf(", type.flags=");
+	printflags(drm_vblank_seq_type_flags,
+		   vblank->reply.type & _DRM_VBLANK_FLAGS_MASK,
+		   "_DRM_VBLANK_???");
 	PRINT_FIELD_U(", ", vblank->reply, sequence);
 	PRINT_FIELD_D(", ", vblank->reply, tval_sec);
 	PRINT_FIELD_D(", ", vblank->reply, tval_usec);
@@ -697,7 +727,7 @@ print_drm_crtc_get_sequence(long rc, void *ptr, void *arg)
 		printf("%p", seq);
 		return;
 	}
-	PRINT_FIELD_U("{", *seq, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID("{", *seq, crtc_id);
 	PRINT_FIELD_U(", ", *seq, active);
 	PRINT_FIELD_U(", ", *seq, sequence);
 	PRINT_FIELD_D(", ", *seq, sequence_ns);
@@ -715,7 +745,7 @@ print_drm_crtc_queue_sequence(long rc, void *ptr, void *arg)
 		printf("%p", seq);
 		return;
 	}
-	PRINT_FIELD_U("{", *seq, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID("{", *seq, crtc_id);
 	printf(", flags=");
 	printflags(drm_crtc_sequence_flags, seq->flags, "DRM_CRTC_SEQUENCE_???");
 	PRINT_FIELD_X(", ", *seq, user_data);
@@ -785,7 +815,7 @@ print_drm_mode_crtc(long rc, void *ptr, void *arg)
 		printf("%p", crtc);
 		return;
 	}
-	PRINT_FIELD_U("{", *crtc, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID("{", *crtc, crtc_id);
 	if (!*is_get) {
 		printf(", set_connectors_ptr=[]");
 		PRINT_FIELD_U(", ", *crtc, count_connectors);
@@ -812,7 +842,7 @@ print_drm_mode_cursor(long rc, void *ptr, void *arg)
 	printf("{flags=");
 	printflags(drm_mode_cursor_flags, cursor->flags,
 		   "DRM_MODE_CURSOR_???");
-	PRINT_FIELD_U(", ", *cursor, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID(", ", *cursor, crtc_id);
 	PRINT_FIELD_D(", ", *cursor, x);
 	PRINT_FIELD_D(", ", *cursor, y);
 	PRINT_FIELD_U(", ", *cursor, width);
@@ -830,7 +860,7 @@ print_drm_mode_get_gamma(long rc, void *ptr, void *arg)
 		printf("%p", lut);
 		return;
 	}
-	PRINT_FIELD_U("{", *lut, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID("{", *lut, crtc_id);
 	PRINT_FIELD_U(", ", *lut, gamma_size);
 	printf(", red=%#llx", (unsigned long long) lut->red);
 	printf(", green=%#llx", (unsigned long long) lut->green);
@@ -847,7 +877,7 @@ print_drm_mode_set_gamma(long rc, void *ptr, void *arg)
 		printf("%p", lut);
 		return;
 	}
-	PRINT_FIELD_U("{", *lut, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID("{", *lut, crtc_id);
 	PRINT_FIELD_U(", ", *lut, gamma_size);
 	printf(", red=%#llx", (unsigned long long) lut->red);
 	printf(", green=%#llx", (unsigned long long) lut->green);
@@ -868,7 +898,7 @@ print_drm_mode_get_encoder(long rc, void *ptr, void *arg)
 	PRINT_FIELD_U("} => {", *enc, encoder_id);
 	printf(", encoder_type=");
 	printxval(drm_mode_encoder_type, enc->encoder_type, "DRM_MODE_ENCODER_???");
-	PRINT_FIELD_U(", ", *enc, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID(", ", *enc, crtc_id);
 	PRINT_FIELD_X(", ", *enc, possible_crtcs);
 	PRINT_FIELD_X(", ", *enc, possible_clones);
 	printf("}");
@@ -954,7 +984,8 @@ print_drm_mode_get_prop_blob(long rc, void *ptr, void *arg)
 	}
 	PRINT_FIELD_U("{", *blob, blob_id);
 	PRINT_FIELD_U(", ", *blob, length);
-	PRINT_FIELD_U(", ", *blob, data);
+	PRINT_FIELD_U("} => {", *blob, length);
+	PRINT_FIELD_ADDR64(", ", *blob, data);
 	printf("}");
 }
 
@@ -1019,7 +1050,7 @@ print_drm_mode_page_flip(long rc, void *ptr, void *arg)
 		printf("%p", flip);
 		return;
 	}
-	PRINT_FIELD_U("{", *flip, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID("{", *flip, crtc_id);
 	PRINT_FIELD_U(", ", *flip, fb_id);
 	printf(", flags=");
 	printflags(drm_mode_page_flip_flags, flip->flags, "DRM_MODE_PAGE_FLIP_???");
@@ -1122,7 +1153,7 @@ print_drm_mode_getplane(long rc, void *ptr, void *arg)
 	PRINT_FIELD_U(", ", *plane, count_format_types);
 	printf(", format_type_ptr=[]");
 	PRINT_FIELD_U("} => {", *plane, plane_id);
-	PRINT_FIELD_U(", ", *plane, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID(", ", *plane, crtc_id);
 	PRINT_FIELD_U(", ", *plane, fb_id);
 	PRINT_FIELD_U(", ", *plane, possible_crtcs);
 	PRINT_FIELD_U(", ", *plane, gamma_size);
@@ -1140,7 +1171,7 @@ print_drm_mode_setplane(long rc, void *ptr, void *arg)
 		return;
 	}
 	PRINT_FIELD_U("{", *plane, plane_id);
-	PRINT_FIELD_U(", ", *plane, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID(", ", *plane, crtc_id);
 	PRINT_FIELD_U(", ", *plane, fb_id);
 	printf(", flags=");
 	printflags(drm_mode_set_plane_flags, plane->flags,
@@ -1185,11 +1216,11 @@ print_drm_mode_add_fb2(long rc, void *ptr, void *arg)
 	       cmd->handles[3], cmd->pitches[0], cmd->pitches[1],
 	       cmd->pitches[2], cmd->pitches[3], cmd->offsets[0],
 	       cmd->offsets[1], cmd->offsets[2], cmd->offsets[3]);
-#ifdef HAVE_STRUCT_DRM_MODE_FB_CMD2_MODIFIER
+# ifdef HAVE_STRUCT_DRM_MODE_FB_CMD2_MODIFIER
 	printf(", modifiers=[%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]",
 	       (uint64_t) cmd->modifier[0], (uint64_t) cmd->modifier[1],
 	       (uint64_t) cmd->modifier[2], (uint64_t) cmd->modifier[3]);
-#endif
+# endif
 	PRINT_FIELD_U(", ", *cmd, fb_id);
 	printf("}");
 }
@@ -1240,7 +1271,7 @@ print_drm_mode_cursor2(long rc, void *ptr, void *arg)
 	printf("{flags=");
 	printflags(drm_mode_cursor_flags, cursor2->flags,
 		   "DRM_MODE_CURSOR_???");
-	PRINT_FIELD_U(", ", *cursor2, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID(", ", *cursor2, crtc_id);
 	PRINT_FIELD_D(", ", *cursor2, x);
 	PRINT_FIELD_D(", ", *cursor2, y);
 	PRINT_FIELD_U(", ", *cursor2, width);
@@ -1283,7 +1314,7 @@ print_drm_mode_createpropblob(long rc, void *ptr, void *arg)
 		printf("%p", blob);
 		return;
 	}
-	printf("{data=%#llx", blob->data);
+	PRINT_FIELD_ADDR64("{", *blob, data);
 	PRINT_FIELD_U(", ", *blob, length);
 	PRINT_FIELD_U(", ", *blob, blob_id);
 	printf("}");
@@ -1349,7 +1380,7 @@ print_drm_syncobj_handle_to_fd(long rc, void *ptr, void *arg)
 	}
 	PRINT_FIELD_U("{", *handle, handle);
 	printf(", flags=");
-	printflags(drm_syncobj_handle_flags, handle->flags, "DRM_SYNCOBJ_???");
+	printflags(drm_syncobj_handle_to_fd_flags, handle->flags, "DRM_SYNCOBJ_???");
 	if (handle->pad)
 		PRINT_FIELD_U(", ", *handle, pad);
 	PRINT_FIELD_D(", ", *handle, fd);
@@ -1369,7 +1400,7 @@ print_drm_syncobj_fd_to_handle(long rc, void *ptr, void *arg)
 	}
 	PRINT_FIELD_D("{", *handle, fd);
 	printf(", flags=");
-	printflags(drm_syncobj_handle_flags, handle->flags, "DRM_SYNCOBJ_???");
+	printflags(drm_syncobj_fd_to_handle_flags, handle->flags, "DRM_SYNCOBJ_???");
 	if (handle->pad)
 		PRINT_FIELD_U(", ", *handle, pad);
 	PRINT_FIELD_U(", ", *handle, handle);
@@ -1744,7 +1775,7 @@ main(int argc, char **argv)
 	/* drm_prime_handle */
 	TAIL_ALLOC_OBJECT_CONST_PTR(struct drm_prime_handle, prime_handle);
 	prime_handle->handle = magic;
-	prime_handle->flags = DRM_RDWR | DRM_CLOEXEC;
+	prime_handle->flags = DRM_CLOEXEC;
 	prime_handle->fd = (int) magic;
 
 	/* drm_agp_mode */
@@ -1782,7 +1813,7 @@ main(int argc, char **argv)
 
 	/* drm_wait_vblank */
 	TAIL_ALLOC_OBJECT_CONST_PTR(union drm_wait_vblank, vblank);
-	vblank->request.type = _DRM_VBLANK_ABSOLUTE;
+	vblank->request.type = _DRM_VBLANK_ABSOLUTE | _DRM_VBLANK_SIGNAL;
 	vblank->request.sequence = magic;
 	vblank->request.signal = lmagic;
 	vblank->reply.tval_usec = (long) lmagic;
@@ -1992,6 +2023,10 @@ main(int argc, char **argv)
 
 	/* drm_mode_fb_cmd2 */
 	TAIL_ALLOC_OBJECT_CONST_PTR(struct drm_mode_fb_cmd2, cmd2);
+	char cmd2_str[4096];
+	snprintf(cmd2_str, sizeof(cmd2_str), "DRM_IOWR(0xb8, %#lx) /* DRM_IOCTL_MODE_ADDFB2 */",
+		 (long unsigned int) _IOC_SIZE(DRM_IOCTL_MODE_ADDFB2));
+
 	cmd2->width = 1;
 	cmd2->height = 1;
 	cmd2->pixel_format = 0x1;
@@ -2000,9 +2035,9 @@ main(int argc, char **argv)
 		cmd2->handles[i] = 1;
 		cmd2->pitches[i] = 1;
 		cmd2->offsets[i] = 1;
-#ifdef HAVE_STRUCT_DRM_MODE_FB_CMD2_MODIFIER
+# ifdef HAVE_STRUCT_DRM_MODE_FB_CMD2_MODIFIER
 		cmd2->modifier[i] = 1;
-#endif
+# endif
 	}
 	cmd2->fb_id = 1;
 
@@ -2231,7 +2266,6 @@ main(int argc, char **argv)
 		{ ARG_STR(DRM_IOCTL_MODE_GETPLANERESOURCES), plane_res, print_drm_mode_getplaneresources },
 		{ ARG_STR(DRM_IOCTL_MODE_GETPLANE), get_plane, print_drm_mode_getplane },
 		{ ARG_STR(DRM_IOCTL_MODE_SETPLANE), set_plane, print_drm_mode_setplane },
-		{ ARG_STR(DRM_IOCTL_MODE_ADDFB2), cmd2, print_drm_mode_add_fb2 },
 		{ ARG_STR(DRM_IOCTL_MODE_OBJ_GETPROPERTIES), obj_get_prop, print_drm_mode_obj_getproperties},
 		{ ARG_STR(DRM_IOCTL_MODE_OBJ_SETPROPERTY), obj_set_prop, print_drm_mode_obj_setproperty },
 		{ ARG_STR(DRM_IOCTL_MODE_CURSOR2), cursor2, print_drm_mode_cursor2 },
@@ -2305,6 +2339,20 @@ main(int argc, char **argv)
 
 	test_drm(&b, NULL);
 
+	struct drm_check check_cmd2 = {
+		.cmd = DRM_IOCTL_MODE_ADDFB2,
+		.cmd_str = cmd2_str,
+		.arg_ptr = cmd2,
+		.print_arg = print_drm_mode_add_fb2,
+	};
+
+	test_drm(&check_cmd2, NULL);
+
 	puts("+++ exited with 0 +++");
 	return 0;
 }
+#else
+
+SKIP_MAIN_UNDEFINED("HAVE_DRM_H && HAVE_DRM_DRM_H");
+
+#endif

@@ -1,5 +1,7 @@
 #include "tests.h"
 
+#if defined(HAVE_DRM_H) || defined(HAVE_DRM_DRM_H)
+
 # include <errno.h>
 # include <inttypes.h>
 # include <stdio.h>
@@ -7,7 +9,11 @@
 # include <string.h>
 # include <sys/ioctl.h>
 
-#include <drm/drm.h>
+# ifdef HAVE_DRM_H
+#  include <drm.h>
+# else
+#  include <drm/drm.h>
+# endif
 
 # define TEST_NULL_ARG_EX(cmd, str)					\
 	do {								\
@@ -100,7 +106,6 @@ main(void)
 	TEST_NULL_ARG(DRM_IOCTL_MODE_GETPLANERESOURCES);
 	TEST_NULL_ARG(DRM_IOCTL_MODE_GETPLANE);
 	TEST_NULL_ARG(DRM_IOCTL_MODE_SETPLANE);
-	TEST_NULL_ARG(DRM_IOCTL_MODE_ADDFB2);
 	TEST_NULL_ARG(DRM_IOCTL_MODE_OBJ_GETPROPERTIES);
 	TEST_NULL_ARG(DRM_IOCTL_MODE_OBJ_SETPROPERTY);
 	TEST_NULL_ARG(DRM_IOCTL_MODE_CURSOR2);
@@ -155,6 +160,11 @@ main(void)
 	       (long unsigned int) _IOC_NR(DRM_IOCTL_MODE_GETCONNECTOR),
 	       (long unsigned int) _IOC_SIZE(DRM_IOCTL_MODE_GETCONNECTOR));
 
+	ioctl(-1, DRM_IOCTL_MODE_ADDFB2, 0);
+	printf("ioctl(-1, DRM_IOWR(%#lx, %#lx) /* DRM_IOCTL_MODE_ADDFB2 */, NULL) = -1 EBADF (%m)\n",
+	       (long unsigned int) _IOC_NR(DRM_IOCTL_MODE_ADDFB2),
+	       (long unsigned int) _IOC_SIZE(DRM_IOCTL_MODE_ADDFB2));
+
 	ioctl(-1, _IOC(_IOC_READ, 0x45, 0x1, 0xff), lmagic);
 	printf("ioctl(-1, %s, %#lx) = -1 EBADF (%m)\n",
 	       "_IOC(_IOC_READ, 0x45, 0x1, 0xff)", lmagic);
@@ -174,3 +184,8 @@ main(void)
 	puts("+++ exited with 0 +++");
 	return 0;
 }
+#else
+
+SKIP_MAIN_UNDEFINED("HAVE_DRM_H && HAVE_DRM_DRM_H");
+
+#endif

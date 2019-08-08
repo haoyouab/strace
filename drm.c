@@ -29,8 +29,9 @@
 #include "xlat/drm_mode_set_plane_flags.h"
 #include "xlat/drm_mode_type.h"
 #include "xlat/drm_prime_handle_flags.h"
+#include "xlat/drm_syncobj_fd_to_handle_flags.h"
 #include "xlat/drm_syncobj_flags.h"
-#include "xlat/drm_syncobj_handle_flags.h"
+#include "xlat/drm_syncobj_handle_to_fd_flags.h"
 #include "xlat/drm_syncobj_wait_flags.h"
 
 static void
@@ -44,6 +45,7 @@ int
 drm_decode_number(struct tcb *const tcp, const unsigned int code)
 {
 	const unsigned int nr = _IOC_NR(code);
+	const unsigned int size = _IOC_SIZE(code);
 
 	if (_IOC_DIR(code) == (_IOC_READ | _IOC_WRITE)) {
 		switch (nr) {
@@ -51,9 +53,20 @@ drm_decode_number(struct tcb *const tcp, const unsigned int code)
 			/* In Linux commit v3.12-rc7~26^2~2 a u32 padding was */
 			/* added to struct drm_mode_get_connector so in old */
 			/* kernel headers the size of this structure is 0x4c */
-			/* instead of 0x50. That's why we only check _IOC_NR */
-			print_drm_iowr(nr, _IOC_SIZE(code),
+			/* instead of today's 0x50, which makes it different */
+			/* among personalities in case of older kernels hence */
+			/* we handle it later in drm_mpers.c instead of here. */
+			/* The newer 0x50-size is not affected even in mpers. */
+			print_drm_iowr(nr, size,
 				       "DRM_IOCTL_MODE_GETCONNECTOR");
+			return IOCTL_NUMBER_STOP_LOOKUP;
+
+		case _IOC_NR(DRM_IOCTL_MODE_ADDFB2):
+			/* The struct size differs among versions of kernels. */
+			/* Specifically, in Linux commit v4.1-rc1~69^2~35^2~57 */
+			/* modifier field was added to the end of structure. */
+			print_drm_iowr(nr, size,
+				       "DRM_IOCTL_MODE_ADDFB2");
 			return IOCTL_NUMBER_STOP_LOOKUP;
 		}
 	}
@@ -66,10 +79,8 @@ drm_get_magic(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_auth auth;
 
-	if (entering(tcp)) {
-		tprints(", ");
+	if (entering(tcp))
 		return 0;
-	}
 
 	/* exiting-only code */
 	if (umove_or_printaddr(tcp, arg, &auth))
@@ -87,7 +98,6 @@ drm_irq_busid(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_irq_busid busid;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &busid))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_D("{", busid, busnum);
@@ -106,30 +116,32 @@ drm_irq_busid(struct tcb *const tcp, const kernel_ulong_t arg)
 	return RVAL_IOCTL_DECODED;
 }
 
+static void
+print_set_version(struct tcb *const tcp, const kernel_ulong_t arg,
+		  struct drm_set_version *ver)
+{
+	PRINT_FIELD_D("{", *ver, drm_di_major);
+	PRINT_FIELD_D(", ", *ver, drm_di_minor);
+	PRINT_FIELD_D(", ", *ver, drm_dd_major);
+	PRINT_FIELD_D(", ", *ver, drm_dd_minor);
+	tprints("}");
+}
+
 static int
 drm_set_version(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_set_version ver;
 
-	if (entering(tcp))
-		tprints(", ");
-	else if (syserror(tcp))
-		return RVAL_IOCTL_DECODED;
-	else
+	if (entering(tcp)) {
+		if (umove_or_printaddr(tcp, arg, &ver))
+			return RVAL_IOCTL_DECODED;
+		print_set_version(tcp, arg, &ver);
+	}
+
+	if (!syserror(tcp) && !umove(tcp, arg, &ver)) {
 		tprints(" => ");
-
-	if (umove_or_printaddr(tcp, arg, &ver))
-		return RVAL_IOCTL_DECODED;
-
-	PRINT_FIELD_D("{", ver, drm_di_major);
-	PRINT_FIELD_D(", ", ver, drm_di_minor);
-	PRINT_FIELD_D(", ", ver, drm_dd_major);
-	PRINT_FIELD_D(", ", ver, drm_dd_minor);
-	tprints("}");
-
-	if (entering(tcp))
-		return 0;
-
+		print_set_version(tcp, arg, &ver);
+	}
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -140,7 +152,6 @@ drm_modeset_ctl(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_modeset_ctl ctl;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &ctl))
 		return RVAL_IOCTL_DECODED;
 
@@ -156,7 +167,6 @@ drm_gem_close(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_gem_close close;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &close))
 		return RVAL_IOCTL_DECODED;
 
@@ -172,7 +182,6 @@ drm_gem_flink(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_gem_flink flink;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &flink))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_U("{", flink, handle);
@@ -195,7 +204,6 @@ drm_gem_open(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_gem_open open;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &open))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_U("{", open, name);
@@ -219,7 +227,6 @@ drm_get_cap(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_get_cap cap;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &cap))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_XVAL("{", cap, capability, drm_capability,
@@ -242,7 +249,6 @@ drm_set_client_cap(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_set_client_cap cap;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &cap))
 		return RVAL_IOCTL_DECODED;
 
@@ -259,7 +265,6 @@ drm_auth_magic(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_auth auth;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &auth))
 		return RVAL_IOCTL_DECODED;
 
@@ -273,7 +278,6 @@ static int
 drm_noop(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	/* No-op ioctl */
-	tprints(", ");
 	printaddr(arg);
 	return RVAL_IOCTL_DECODED;
 }
@@ -283,7 +287,6 @@ drm_control(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_control control;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &control))
 		return RVAL_IOCTL_DECODED;
 
@@ -296,52 +299,20 @@ drm_control(struct tcb *const tcp, const kernel_ulong_t arg)
 }
 
 static int
-drm_ctx(struct tcb *const tcp, const kernel_ulong_t arg)
+drm_ctx(struct tcb *const tcp, const kernel_ulong_t arg, bool is_get)
 {
+	/* GET_CTX ioctl does not touch handle */
+	/* field according to the drvier code. */
 	struct drm_ctx ctx;
 
-	if (entering(tcp)) {
-		tprints(", ");
-		return 0;
-	}
-
-	/* exiting-only code */
 	if (umove_or_printaddr(tcp, arg, &ctx))
 		return RVAL_IOCTL_DECODED;
-	PRINT_FIELD_U("{", ctx, handle);
-	tprints("}");
+	if (is_get)
+		PRINT_FIELD_FLAGS("{", ctx, flags, drm_ctx_flags,
+				  "_DRM_CONTEXT_???");
+	else
+		PRINT_FIELD_U("{", ctx, handle);
 
-	return RVAL_IOCTL_DECODED;
-}
-
-static int
-drm_rm_ctx(struct tcb *const tcp, const kernel_ulong_t arg)
-{
-	struct drm_ctx ctx;
-
-	tprints(", ");
-	if (umove_or_printaddr(tcp, arg, &ctx))
-		return RVAL_IOCTL_DECODED;
-	PRINT_FIELD_U("{", ctx, handle);
-	tprints("}");
-
-	return RVAL_IOCTL_DECODED;
-}
-
-static int
-drm_get_ctx(struct tcb *const tcp, const kernel_ulong_t arg)
-{
-	struct drm_ctx ctx;
-
-	if (entering(tcp)) {
-		tprints(", ");
-		return 0;
-	}
-
-	/* exiting-only code */
-	if (umove_or_printaddr(tcp, arg, &ctx))
-		return RVAL_IOCTL_DECODED;
-	PRINT_FIELD_FLAGS("{", ctx, flags, drm_ctx_flags, "_DRM_CONTEXT_???");
 	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
@@ -352,10 +323,8 @@ drm_lock(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_lock lock;
 
-	if (entering(tcp)) {
-		tprints(", ");
+	if (entering(tcp))
 		return 0;
-	}
 
 	/* exiting-only code */
 	if (umove_or_printaddr(tcp, arg, &lock))
@@ -373,7 +342,6 @@ drm_prime_handle_to_fd(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_prime_handle handle;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &handle))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_U("{", handle, handle);
@@ -398,7 +366,6 @@ drm_prime_fd_to_handle(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_prime_handle handle;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &handle))
 			return RVAL_IOCTL_DECODED;
 		/* The printing oder here is different comparing to */
@@ -425,10 +392,9 @@ drm_crtc_get_sequence(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_crtc_get_sequence seq;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &seq))
 			return RVAL_IOCTL_DECODED;
-		PRINT_FIELD_U("{", seq, crtc_id);
+		PRINT_FIELD_DRM_CRTC_ID("{", seq, crtc_id);
 
 		return 0;
 	}
@@ -449,18 +415,10 @@ drm_crtc_queue_sequence(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_crtc_queue_sequence seq;
 
-	if (entering(tcp))
-		tprints(", ");
-	else if (syserror(tcp))
-		return RVAL_IOCTL_DECODED;
-	else
-		tprints(" => ");
-
-	if (umove_or_printaddr(tcp, arg, &seq))
-		return RVAL_IOCTL_DECODED;
-
 	if (entering(tcp)) {
-		PRINT_FIELD_U("{", seq, crtc_id);
+		if (umove_or_printaddr(tcp, arg, &seq))
+			return RVAL_IOCTL_DECODED;
+		PRINT_FIELD_DRM_CRTC_ID("{", seq, crtc_id);
 		PRINT_FIELD_FLAGS(", ", seq, flags, drm_crtc_sequence_flags,
 				 "DRM_CRTC_SEQUENCE_???");
 		PRINT_FIELD_X(", ", seq, user_data);
@@ -468,8 +426,10 @@ drm_crtc_queue_sequence(struct tcb *const tcp, const kernel_ulong_t arg)
 		tprints("}");
 
 		return 0;
-	} else {
-		PRINT_FIELD_U("{", seq, sequence);
+	}
+
+	if (!syserror(tcp) && !umove(tcp, arg, &seq)) {
+		PRINT_FIELD_U(" => {", seq, sequence);
 		tprints("}");
 	}
 
@@ -482,17 +442,9 @@ drm_mode_get_resources(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_card_res res;
 	uint32_t u32_val;
 
-	if (entering(tcp))
-		tprints(", ");
-	else if (syserror(tcp))
-		return RVAL_IOCTL_DECODED;
-	else
-		tprints(" => ");
-
-	if (umove_or_printaddr(tcp, arg, &res))
-		return RVAL_IOCTL_DECODED;
-
 	if (entering(tcp)) {
+		if (umove_or_printaddr(tcp, arg, &res))
+			return RVAL_IOCTL_DECODED;
 		tprints("{fb_id_ptr=");
 		print_array(tcp, res.fb_id_ptr, res.count_fbs,
 			    &u32_val, sizeof(u32_val),
@@ -518,16 +470,17 @@ drm_mode_get_resources(struct tcb *const tcp, const kernel_ulong_t arg)
 		return 0;
 	}
 
-	PRINT_FIELD_U("{", res, count_fbs);
-	PRINT_FIELD_U(", ", res, count_crtcs);
-	PRINT_FIELD_U(", ", res, count_connectors);
-	PRINT_FIELD_U(", ", res, count_encoders);
-	PRINT_FIELD_U(", ", res, min_width);
-	PRINT_FIELD_U(", ", res, max_width);
-	PRINT_FIELD_U(", ", res, min_height);
-	PRINT_FIELD_U(", ", res, max_height);
-
-	tprints("}");
+	if (!syserror(tcp) && !umove(tcp, arg, &res)) {
+		PRINT_FIELD_U(" => {", res, count_fbs);
+		PRINT_FIELD_U(", ", res, count_crtcs);
+		PRINT_FIELD_U(", ", res, count_connectors);
+		PRINT_FIELD_U(", ", res, count_encoders);
+		PRINT_FIELD_U(", ", res, min_width);
+		PRINT_FIELD_U(", ", res, max_width);
+		PRINT_FIELD_U(", ", res, min_height);
+		PRINT_FIELD_U(", ", res, max_height);
+		tprints("}");
+	}
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -563,7 +516,8 @@ print_drm_mode_crtc_tail(struct tcb *const tcp, struct drm_mode_crtc *crtc,
 
 	if (!is_get) {
 		tprints(", set_connectors_ptr=");
-		print_array(tcp, crtc->set_connectors_ptr, crtc->count_connectors,
+		print_array(tcp, crtc->set_connectors_ptr,
+			    crtc->count_connectors,
 			    &set_connectors_ptr, sizeof(set_connectors_ptr),
 			    tfetch_mem, print_uint32_array_member, 0);
 		PRINT_FIELD_U(", ", *crtc, count_connectors);
@@ -584,10 +538,9 @@ drm_mode_crtc(struct tcb *const tcp, const kernel_ulong_t arg,
 	struct drm_mode_crtc crtc;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &crtc))
 			return RVAL_IOCTL_DECODED;
-		PRINT_FIELD_U("{", crtc, crtc_id);
+		PRINT_FIELD_DRM_CRTC_ID("{", crtc, crtc_id);
 		if (is_get)
 			return 0;
 		print_drm_mode_crtc_tail(tcp, &crtc, is_get);
@@ -609,13 +562,12 @@ drm_mode_cursor(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_cursor cursor;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &cursor))
 		return RVAL_IOCTL_DECODED;
 
 	PRINT_FIELD_FLAGS("{", cursor, flags, drm_mode_cursor_flags,
 			  "DRM_MODE_CURSOR_???");
-	PRINT_FIELD_U(", ", cursor, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID(", ", cursor, crtc_id);
 	PRINT_FIELD_D(", ", cursor, x);
 	PRINT_FIELD_D(", ", cursor, y);
 	PRINT_FIELD_U(", ", cursor, width);
@@ -633,12 +585,11 @@ drm_mode_gamma(struct tcb *const tcp, const kernel_ulong_t arg)
 	int array_size;
 	uint16_t u32_val;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &lut))
 		return RVAL_IOCTL_DECODED;
 
 	array_size = lut.gamma_size * (sizeof(uint16_t));
-	PRINT_FIELD_U("{", lut, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID("{", lut, crtc_id);
 	PRINT_FIELD_U(", ", lut, gamma_size);
 	tprints(", red=");
 	print_array(tcp, lut.red, array_size,
@@ -663,30 +614,25 @@ drm_mode_get_encoder(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_get_encoder enc;
 
-	if (entering(tcp))
-		tprints(", ");
-	else if (syserror(tcp))
-		return RVAL_IOCTL_DECODED;
-	else
-		tprints(" => ");
-
-	if (umove_or_printaddr(tcp, arg, &enc))
-		return RVAL_IOCTL_DECODED;
-
-	PRINT_FIELD_U("{", enc, encoder_id);
-
 	if (entering(tcp)) {
+		if (umove_or_printaddr(tcp, arg, &enc))
+			return RVAL_IOCTL_DECODED;
+
+		PRINT_FIELD_U("{", enc, encoder_id);
 		tprints("}");
 
 		return 0;
 	}
 
-	PRINT_FIELD_XVAL(", ", enc, encoder_type, drm_mode_encoder_type,
-			 "DRM_MODE_ENCODER_???");
-	PRINT_FIELD_U(", ", enc, crtc_id);
-	PRINT_FIELD_X(", ", enc, possible_crtcs);
-	PRINT_FIELD_X(", ", enc, possible_clones);
-	tprints("}");
+	if (!syserror(tcp) && !umove(tcp, arg, &enc)) {
+		PRINT_FIELD_U(" => {", enc, encoder_id);
+		PRINT_FIELD_XVAL(", ", enc, encoder_type, drm_mode_encoder_type,
+				 "DRM_MODE_ENCODER_???");
+		PRINT_FIELD_DRM_CRTC_ID(", ", enc, crtc_id);
+		PRINT_FIELD_X(", ", enc, possible_crtcs);
+		PRINT_FIELD_X(", ", enc, possible_clones);
+		tprints("}");
+	}
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -709,17 +655,10 @@ drm_mode_get_property(struct tcb *const tcp, const kernel_ulong_t arg)
 	uint64_t values_val;
 	struct drm_mode_property_enum enum_blob_val;
 
-	if (entering(tcp))
-		tprints(", ");
-	else if (syserror(tcp))
-		return RVAL_IOCTL_DECODED;
-	else
-		tprints(" => ");
-
-	if (umove_or_printaddr(tcp, arg, &prop))
-		return RVAL_IOCTL_DECODED;
-
 	if (entering(tcp)) {
+		if (umove_or_printaddr(tcp, arg, &prop))
+			return RVAL_IOCTL_DECODED;
+
 		PRINT_FIELD_U("{", prop, prop_id);
 		PRINT_FIELD_U(", ", prop, count_values);
 		PRINT_FIELD_U(", ", prop, count_enum_blobs);
@@ -728,21 +667,22 @@ drm_mode_get_property(struct tcb *const tcp, const kernel_ulong_t arg)
 		return 0;
 	}
 
-	tprints("{values_ptr=");
-	print_array(tcp, prop.values_ptr, prop.count_values,
-		    &values_val, sizeof(values_val),
-		    tfetch_mem, print_uint64_array_member, 0);
-	tprints(", enum_blob_ptr=");
-	print_array(tcp, prop.enum_blob_ptr, prop.count_enum_blobs,
-		    &enum_blob_val, sizeof(enum_blob_val),
-		    tfetch_mem, print_drm_mode_property_enum, 0);
-	PRINT_FIELD_FLAGS(", ", prop, flags, drm_mode_get_property_flags,
-			  "DRM_MODE_PROP_???");
-	PRINT_FIELD_CSTRING(", ", prop, name);
-	PRINT_FIELD_U(", ", prop, count_values);
-	PRINT_FIELD_U(", ", prop, count_enum_blobs);
-
-	tprints("}");
+	if (!syserror(tcp) && !umove(tcp, arg, &prop)) {
+		tprints(" => {values_ptr=");
+		print_array(tcp, prop.values_ptr, prop.count_values,
+			    &values_val, sizeof(values_val),
+			    tfetch_mem, print_uint64_array_member, 0);
+		tprints(", enum_blob_ptr=");
+		print_array(tcp, prop.enum_blob_ptr, prop.count_enum_blobs,
+			    &enum_blob_val, sizeof(enum_blob_val),
+			    tfetch_mem, print_drm_mode_property_enum, 0);
+		PRINT_FIELD_FLAGS(", ", prop, flags, drm_mode_get_property_flags,
+				  "DRM_MODE_PROP_???");
+		PRINT_FIELD_CSTRING(", ", prop, name);
+		PRINT_FIELD_U(", ", prop, count_values);
+		PRINT_FIELD_U(", ", prop, count_enum_blobs);
+		tprints("}");
+	}
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -752,7 +692,6 @@ drm_mode_set_property(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_connector_set_property prop;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &prop))
 		return RVAL_IOCTL_DECODED;
 
@@ -770,20 +709,20 @@ drm_mode_get_prop_blob(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_get_blob blob;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &blob))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_U("{", blob, blob_id);
+		PRINT_FIELD_U(", ", blob, length);
+		tprints("}");
 
 		return 0;
 	}
 
 	if (!syserror(tcp) && !umove(tcp, arg, &blob)) {
-		PRINT_FIELD_U(", ", blob, length);
-		PRINT_FIELD_U(", ", blob, data);
+		PRINT_FIELD_U(" => {", blob, length);
+		PRINT_FIELD_ADDR64(", ", blob, data);
+		tprints("}");
 	}
-
-	tprints("}");
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -808,7 +747,6 @@ drm_mode_get_fb(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_fb_cmd cmd;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &cmd))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_U("{", cmd, fb_id);
@@ -832,7 +770,6 @@ drm_mode_add_fb(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_fb_cmd cmd;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &cmd))
 			return RVAL_IOCTL_DECODED;
 		tprints("{");
@@ -855,7 +792,6 @@ drm_mode_rm_fb(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	unsigned int fb_id;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &fb_id))
 		return RVAL_IOCTL_DECODED;
 
@@ -869,11 +805,10 @@ drm_mode_page_flip(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_crtc_page_flip flip;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &flip))
 		return RVAL_IOCTL_DECODED;
 
-	PRINT_FIELD_U("{", flip, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID("{", flip, crtc_id);
 	PRINT_FIELD_U(", ", flip, fb_id);
 	PRINT_FIELD_FLAGS(", ", flip, flags, drm_mode_page_flip_flags,
 			 "DRM_MODE_PAGE_FLIP_???");
@@ -902,7 +837,6 @@ drm_mode_dirty_fb(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_fb_dirty_cmd cmd;
 	struct drm_clip_rect clips_val;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &cmd))
 		return RVAL_IOCTL_DECODED;
 
@@ -926,7 +860,6 @@ drm_mode_create_dumb(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_create_dumb dumb;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &dumb))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_U("{", dumb, width);
@@ -954,7 +887,6 @@ drm_mode_map_dumb(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_map_dumb dumb;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &dumb))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_U("{", dumb, handle);
@@ -976,7 +908,6 @@ drm_mode_destroy_dumb(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_destroy_dumb dumb;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &dumb))
 		return RVAL_IOCTL_DECODED;
 
@@ -992,17 +923,10 @@ drm_mode_getplane(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_get_plane plane;
 	uint32_t formant_type_val;
 
-	if (entering(tcp))
-		tprints(", ");
-	else if (syserror(tcp))
-		return RVAL_IOCTL_DECODED;
-	else
-		tprints(" => ");
-
-	if (umove_or_printaddr(tcp, arg, &plane))
-		return RVAL_IOCTL_DECODED;
-
 	if (entering(tcp)) {
+		if (umove_or_printaddr(tcp, arg, &plane))
+			return RVAL_IOCTL_DECODED;
+
 		PRINT_FIELD_U("{", plane, plane_id);
 		PRINT_FIELD_U(", ", plane, count_format_types);
 		tprints(", format_type_ptr=");
@@ -1016,14 +940,16 @@ drm_mode_getplane(struct tcb *const tcp, const kernel_ulong_t arg)
 		return 0;
 	}
 
-	PRINT_FIELD_U("{", plane, plane_id);
-	PRINT_FIELD_U(", ", plane, crtc_id);
-	PRINT_FIELD_U(", ", plane, fb_id);
-	PRINT_FIELD_U(", ", plane, possible_crtcs);
-	PRINT_FIELD_U(", ", plane, gamma_size);
-	PRINT_FIELD_U(", ", plane, count_format_types);
+	if (!syserror(tcp) && !umove(tcp, arg, &plane)) {
+		PRINT_FIELD_U(" => {", plane, plane_id);
+		PRINT_FIELD_DRM_CRTC_ID(", ", plane, crtc_id);
+		PRINT_FIELD_U(", ", plane, fb_id);
+		PRINT_FIELD_U(", ", plane, possible_crtcs);
+		PRINT_FIELD_U(", ", plane, gamma_size);
+		PRINT_FIELD_U(", ", plane, count_format_types);
 
-	tprints("}");
+		tprints("}");
+	}
 
 	return RVAL_IOCTL_DECODED;
 }
@@ -1034,11 +960,10 @@ drm_mode_setplane(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_set_plane plane;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &plane))
 			return RVAL_IOCTL_DECODED;
 		PRINT_FIELD_U("{", plane, plane_id);
-		PRINT_FIELD_U(", ", plane, crtc_id);
+		PRINT_FIELD_DRM_CRTC_ID(", ", plane, crtc_id);
 		PRINT_FIELD_U(", ", plane, fb_id);
 		PRINT_FIELD_FLAGS(", ", plane, flags, drm_mode_set_plane_flags,
 				  "DRM_MODE_PRESENT_???");
@@ -1077,13 +1002,12 @@ drm_mode_cursor2(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_cursor2 cursor;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &cursor))
 		return RVAL_IOCTL_DECODED;
 
 	PRINT_FIELD_FLAGS("{", cursor, flags, drm_mode_cursor_flags,
 			  "DRM_MODE_CURSOR_???");
-	PRINT_FIELD_U(", ", cursor, crtc_id);
+	PRINT_FIELD_DRM_CRTC_ID(", ", cursor, crtc_id);
 	PRINT_FIELD_D(", ", cursor, x);
 	PRINT_FIELD_D(", ", cursor, y);
 	PRINT_FIELD_U(", ", cursor, width);
@@ -1103,7 +1027,6 @@ drm_mode_atomic(struct tcb *const tcp, const kernel_ulong_t arg)
 	uint32_t u32_val;
 	uint64_t u64_val;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &atomic))
 		return RVAL_IOCTL_DECODED;
 
@@ -1140,11 +1063,9 @@ drm_mode_createpropblob(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_create_blob blob;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &blob))
 			return RVAL_IOCTL_DECODED;
 
-		// TODO: print blob using printstr
 		PRINT_FIELD_ADDR64("{", blob, data);
 		PRINT_FIELD_U(", ", blob, length);
 
@@ -1165,7 +1086,6 @@ drm_mode_destroypropblob(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_destroy_blob blob;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &blob))
 		return RVAL_IOCTL_DECODED;
 
@@ -1181,7 +1101,6 @@ drm_syncobj_create(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_syncobj_create create;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &create))
 			return RVAL_IOCTL_DECODED;
 
@@ -1205,7 +1124,6 @@ drm_syncobj_destroy(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_syncobj_destroy destroy;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &destroy))
 		return RVAL_IOCTL_DECODED;
 
@@ -1224,17 +1142,20 @@ drm_syncobj_handle_fd(struct tcb *const tcp, const kernel_ulong_t arg,
 	struct drm_syncobj_handle handle;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &handle))
 			return RVAL_IOCTL_DECODED;
 
-		if (is_handle_to_fd)
+		if (is_handle_to_fd) {
 			PRINT_FIELD_U("{", handle, handle);
-		else
+			PRINT_FIELD_FLAGS(", ", handle, flags,
+					  drm_syncobj_handle_to_fd_flags,
+					  "DRM_SYNCOBJ_???");
+		} else {
 			PRINT_FIELD_FD("{", handle, fd, tcp);
-		PRINT_FIELD_FLAGS(", ", handle, flags,
-				  drm_syncobj_handle_flags,
-				  "DRM_SYNCOBJ_???");
+			PRINT_FIELD_FLAGS(", ", handle, flags,
+					  drm_syncobj_fd_to_handle_flags,
+					  "DRM_SYNCOBJ_???");
+		}
 		if (handle.pad)
 			PRINT_FIELD_U(", ", handle, pad);
 
@@ -1260,7 +1181,6 @@ drm_syncobj_wait(struct tcb *const tcp, const kernel_ulong_t arg)
 	uint32_t handles_val;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &wait))
 			return RVAL_IOCTL_DECODED;
 		tprints("{handles=");
@@ -1290,7 +1210,6 @@ drm_syncobj_reset_or_signal(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_syncobj_array array;
 	uint32_t handles_val;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &array))
 		return RVAL_IOCTL_DECODED;
 
@@ -1313,7 +1232,6 @@ drm_mode_create_lease(struct tcb *const tcp, const kernel_ulong_t arg)
 	uint32_t object_val;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &lease))
 			return RVAL_IOCTL_DECODED;
 
@@ -1346,17 +1264,10 @@ drm_mode_list_lessees(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_list_lessees lessees;
 	uint32_t lessees_val;
 
-	if (entering(tcp))
-		tprints(", ");
-	else if (syserror(tcp))
-		return RVAL_IOCTL_DECODED;
-	else
-		tprints(" => ");
-
-	if (umove_or_printaddr(tcp, arg, &lessees))
-		return RVAL_IOCTL_DECODED;
-
 	if (entering(tcp)) {
+		if (umove_or_printaddr(tcp, arg, &lessees))
+			return RVAL_IOCTL_DECODED;
+
 		PRINT_FIELD_U("{", lessees, count_lessees);
 		if (lessees.pad)
 			PRINT_FIELD_U(", ", lessees, pad);
@@ -1368,8 +1279,10 @@ drm_mode_list_lessees(struct tcb *const tcp, const kernel_ulong_t arg)
 		tprints("}");
 
 		return 0;
-	} else {
-		PRINT_FIELD_U("{", lessees, count_lessees);
+	}
+
+	if (!syserror(tcp) && !umove(tcp, arg, &lessees)) {
+		PRINT_FIELD_U(" => {", lessees, count_lessees);
 		tprints("}");
 	}
 
@@ -1382,17 +1295,10 @@ drm_mode_get_lease(struct tcb *const tcp, const kernel_ulong_t arg)
 	struct drm_mode_get_lease lease;
 	uint32_t objects_val;
 
-	if (entering(tcp))
-		tprints(", ");
-	else if (syserror(tcp))
-		return RVAL_IOCTL_DECODED;
-	else
-		tprints(" => ");
-
-	if (umove_or_printaddr(tcp, arg, &lease))
-		return RVAL_IOCTL_DECODED;
-
 	if (entering(tcp)) {
+		if (umove_or_printaddr(tcp, arg, &lease))
+			return RVAL_IOCTL_DECODED;
+
 		PRINT_FIELD_U("{", lease, count_objects);
 		if (lease.pad)
 			PRINT_FIELD_U(", ", lease, pad);
@@ -1404,8 +1310,10 @@ drm_mode_get_lease(struct tcb *const tcp, const kernel_ulong_t arg)
 		tprints("}");
 
 		return 0;
-	} else {
-		PRINT_FIELD_U("{", lease, count_objects);
+	}
+
+	if (!syserror(tcp) && !umove(tcp, arg, &lease)) {
+		PRINT_FIELD_U(" => {", lease, count_objects);
 		tprints("}");
 	}
 
@@ -1418,7 +1326,6 @@ drm_mode_revoke_lease(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_mode_revoke_lease lease;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &lease))
 		return RVAL_IOCTL_DECODED;
 
@@ -1435,7 +1342,6 @@ drm_syncobj_timeline_wait(struct tcb *const tcp, const kernel_ulong_t arg)
 	uint32_t handles_val;
 
 	if (entering(tcp)) {
-		tprints(", ");
 		if (umove_or_printaddr(tcp, arg, &wait))
 			return RVAL_IOCTL_DECODED;
 		tprints("{handles=");
@@ -1460,13 +1366,13 @@ drm_syncobj_timeline_wait(struct tcb *const tcp, const kernel_ulong_t arg)
 }
 
 static int
-drm_syncobj_query_or_timeline_signal(struct tcb *const tcp, const kernel_ulong_t arg)
+drm_syncobj_query_or_timeline_signal(struct tcb *const tcp,
+				     const kernel_ulong_t arg)
 {
 	struct drm_syncobj_timeline_array array;
 	uint32_t handles_val;
 	uint64_t points_val;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &array))
 		return RVAL_IOCTL_DECODED;
 
@@ -1492,7 +1398,6 @@ drm_syncobj_transfer(struct tcb *const tcp, const kernel_ulong_t arg)
 {
 	struct drm_syncobj_transfer transfer;
 
-	tprints(", ");
 	if (umove_or_printaddr(tcp, arg, &transfer))
 		return RVAL_IOCTL_DECODED;
 
@@ -1513,6 +1418,9 @@ int
 drm_ioctl(struct tcb *const tcp, const unsigned int code,
 	  const kernel_ulong_t arg)
 {
+	if (entering(tcp))
+		tprints(", ");
+
 	switch (code) {
 	case DRM_IOCTL_GET_MAGIC: /* R */
 		return drm_get_magic(tcp, arg);
@@ -1549,11 +1457,12 @@ drm_ioctl(struct tcb *const tcp, const unsigned int code,
 	case DRM_IOCTL_ADD_CTX: /* RW */
 	case DRM_IOCTL_SWITCH_CTX: /* W */
 	case DRM_IOCTL_NEW_CTX: /* W */
-		return drm_ctx(tcp, arg);
-	case DRM_IOCTL_RM_CTX: /* RW */
-		return drm_rm_ctx(tcp, arg);
 	case DRM_IOCTL_GET_CTX: /* RW */
-		return drm_get_ctx(tcp, arg);
+		if (entering(tcp))
+			return 0;
+		return drm_ctx(tcp, arg, code == DRM_IOCTL_GET_CTX);
+	case DRM_IOCTL_RM_CTX: /* RW */
+		return drm_ctx(tcp, arg, false);
 	case DRM_IOCTL_LOCK: /* W */
 	case DRM_IOCTL_UNLOCK: /* W */
 		return drm_lock(tcp, arg);

@@ -515,6 +515,12 @@ umoven(struct tcb *, kernel_ulong_t addr, unsigned int len, void *laddr);
 /**
  * @return true on success, false on error.
  */
+# define umove_nor_syserror(tcp, arg, objp) \
+	(!syserror(tcp) && !umove(tcp, arg, objp))
+
+/**
+ * @return true on success, false on error.
+ */
 extern bool
 tfetch_mem64(struct tcb *, uint64_t addr, unsigned int len, void *laddr);
 
